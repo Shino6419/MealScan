@@ -1,0 +1,303 @@
+KE HOACH PHAT TRIEN APP MEALSCAN
+
+Mo ta tong quan
+- MealScan la app React Native dung AI de nhan dien mon an tu hinh anh.
+- Sau khi nhan dien, app du doan calo va thong tin dinh duong co ban.
+- Nguoi dung co the them bua an vao lich su an uong.
+- App thong ke tong calo da tieu thu theo tung ngay, giup nguoi dung theo doi thoi quen an uong.
+
+
+1. CHUC NANG TAI KHOAN
+
+1.1. Man hinh Dang nhap
+- Nhap email hoac ten dang nhap.
+- Nhap mat khau.
+- Nut Dang nhap.
+- Link chuyen sang Dang ky.
+- Link quen mat khau neu can.
+- Hien thi loi khi email/mat khau sai.
+- Luu trang thai dang nhap de lan sau mo app khong can dang nhap lai.
+
+1.2. Man hinh Dang ky
+- Nhap ho ten.
+- Nhap email.
+- Nhap mat khau.
+- Nhap lai mat khau.
+- Nut Tao tai khoan.
+- Kiem tra email hop le.
+- Kiem tra mat khau du dai toi thieu.
+- Hien thi loi neu email da ton tai hoac mat khau khong khop.
+- Sau khi dang ky thanh cong co the tu dong dang nhap hoac chuyen ve man hinh Dang nhap.
+
+1.3. Man hinh Quen mat khau
+- Nhap email.
+- Gui yeu cau dat lai mat khau.
+- Hien thi thong bao sau khi gui thanh cong.
+
+
+2. THANH NAVIGATION DUOI
+
+Sau khi dang nhap thanh cong, app hien thi Bottom Tab Navigation gom 3 nut:
+
+2.1. Thong ke
+- Icon goi y: bar chart, home, calendar.
+- Chuyen den man hinh thong ke chinh.
+
+2.2. Chup anh
+- Icon goi y: camera, scan.
+- Chuyen den man hinh chup anh/nhan dien mon an.
+
+2.3. Profile/Setting
+- Icon goi y: user, settings.
+- Chuyen den man hinh ho so va cai dat.
+
+
+3. CAC MAN HINH CHINH CAN LAM
+
+3.1. Man hinh Thong ke chinh
+Muc dich:
+- La man hinh tong quan ve luong calo nguoi dung da tieu thu.
+
+Chuc nang can co:
+- Hien thi tong calo da an trong ngay hien tai.
+- Hien thi muc tieu calo moi ngay cua nguoi dung.
+- Hien thi calo con lai hoac calo vuot muc tieu.
+- Bieu do thong ke calo theo ngay trong tuan.
+- Danh sach cac bua an trong ngay.
+- Moi item bua an gom:
+  + Hinh anh mon an.
+  + Ten mon an.
+  + So calo uoc tinh.
+  + Thoi gian an.
+- Loc/thay doi ngay de xem lich su cac ngay truoc.
+- Nut xem chi tiet mot bua an.
+- Nut xoa bua an khoi lich su neu nguoi dung nhap sai.
+
+Du lieu can luu:
+- Tong calo theo ngay.
+- Danh sach bua an.
+- Thoi gian them bua an.
+- Anh mon an.
+- Ket qua AI nhan dien.
+
+
+3.2. Man hinh Chup anh
+Muc dich:
+- Cho phep nguoi dung chup anh mon an hoac chon anh tu thu vien de AI nhan dien.
+
+Chuc nang can co:
+- Mo camera.
+- Xin quyen truy cap camera.
+- Chup anh mon an.
+- Chon anh tu thu vien.
+- Xem lai anh truoc khi gui AI.
+- Nut Phan tich mon an.
+- Trang thai loading khi AI dang xu ly.
+- Hien thi loi neu khong nhan dien duoc mon an.
+
+Sau khi AI phan tich xong:
+- Chuyen sang man hinh Ket qua nhan dien hoac hien thi modal ket qua.
+
+
+3.3. Man hinh Ket qua nhan dien mon an
+Muc dich:
+- Cho nguoi dung xem, sua va xac nhan ket qua truoc khi them vao lich su.
+
+Chuc nang can co:
+- Hien thi anh mon an vua chup/chon.
+- Hien thi ten mon an AI nhan dien.
+- Hien thi calo uoc tinh.
+- Hien thi thong tin dinh duong neu co:
+  + Protein.
+  + Carbs.
+  + Fat.
+  + Khau phan/serving size.
+- Cho phep nguoi dung sua ten mon an.
+- Cho phep nguoi dung sua calo neu AI du doan sai.
+- Cho phep chon loai bua an:
+  + Sang.
+  + Trua.
+  + Toi.
+  + An nhe.
+- Nut Them vao lich su.
+- Nut Chup lai/Chon anh khac.
+
+Du lieu can gui vao lich su:
+- User ID.
+- Anh mon an.
+- Ten mon an.
+- Calo.
+- Nutrition info.
+- Loai bua an.
+- Ngay gio tao.
+
+
+3.4. Man hinh Lich su bua an
+Muc dich:
+- Quan ly tat ca bua an da them.
+
+Chuc nang can co:
+- Hien thi danh sach bua an theo ngay.
+- Loc theo ngay/tuan/thang.
+- Tim kiem mon an theo ten.
+- Xem chi tiet bua an.
+- Sua thong tin bua an.
+- Xoa bua an.
+- Tu dong cap nhat lai thong ke sau khi sua/xoa.
+
+Ghi chu:
+- Man hinh nay co the nam trong tab Thong ke, khong nhat thiet phai la mot tab rieng.
+
+
+3.5. Man hinh Chi tiet bua an
+Muc dich:
+- Hien thi chi tiet mot mon an da luu.
+
+Chuc nang can co:
+- Hinh anh mon an.
+- Ten mon an.
+- Calo.
+- Protein, carbs, fat neu co.
+- Loai bua an.
+- Ngay gio da them.
+- Nut Sua.
+- Nut Xoa.
+
+
+3.6. Man hinh Profile/Setting
+Muc dich:
+- Quan ly thong tin nguoi dung va cai dat app.
+
+Chuc nang can co:
+- Hien thi anh dai dien.
+- Hien thi ten nguoi dung.
+- Hien thi email.
+- Sua thong tin ca nhan.
+- Cai dat muc tieu calo moi ngay.
+- Cai dat thong tin co the de tinh toan tot hon:
+  + Tuoi.
+  + Gioi tinh.
+  + Chieu cao.
+  + Can nang.
+  + Muc do van dong.
+  + Muc tieu: giam can, giu can, tang can.
+- Doi mat khau.
+- Dang xuat.
+- Xoa tai khoan neu can.
+
+
+4. CAC CHUC NANG BACKEND / DU LIEU CAN CO
+
+4.1. Authentication
+- Dang ky tai khoan.
+- Dang nhap.
+- Dang xuat.
+- Luu session/token.
+- Bao ve cac man hinh chinh, chi cho vao khi da dang nhap.
+
+4.2. User Profile
+- Luu thong tin nguoi dung.
+- Luu muc tieu calo moi ngay.
+- Cap nhat profile.
+
+4.3. AI Food Recognition
+- Gui anh mon an len AI.
+- Nhan ve ten mon an.
+- Nhan ve calo uoc tinh.
+- Nhan ve nutrition info neu AI ho tro.
+- Xu ly truong hop AI tra ve ket qua khong chac chan.
+
+4.4. Meal History
+- Them bua an moi.
+- Lay danh sach bua an theo user.
+- Lay bua an theo ngay.
+- Sua bua an.
+- Xoa bua an.
+
+4.5. Statistics
+- Tinh tong calo theo ngay.
+- Tinh tong calo theo tuan.
+- Tinh trung binh calo moi ngay.
+- So sanh voi muc tieu calo.
+- Tao du lieu cho bieu do.
+
+
+5. GOI Y CAU TRUC NAVIGATION
+
+Luon di theo flow:
+
+- Neu chua dang nhap:
+  + Dang nhap
+  + Dang ky
+  + Quen mat khau
+
+- Neu da dang nhap:
+  + Bottom Tab Navigation
+    + Tab Thong ke
+      - Man hinh Thong ke chinh
+      - Man hinh Lich su bua an
+      - Man hinh Chi tiet bua an
+    + Tab Chup anh
+      - Man hinh Chup anh
+      - Man hinh Ket qua nhan dien mon an
+    + Tab Profile/Setting
+      - Man hinh Profile/Setting
+      - Man hinh Sua profile
+      - Man hinh Cai dat muc tieu calo
+
+
+6. THU TU UU TIEN NEN LAM
+
+Giai doan 1: Nen tang app
+- Tao navigation.
+- Tao man hinh Dang nhap.
+- Tao man hinh Dang ky.
+- Tao Bottom Tab Navigation voi 3 tab.
+- Tao UI co ban cho Thong ke, Chup anh, Profile.
+
+Giai doan 2: Xu ly du lieu co ban
+- Tao model du lieu cho user.
+- Tao model du lieu cho meal history.
+- Them bua an thu cong de test truoc khi tich hop AI.
+- Hien thi lich su bua an.
+- Tinh tong calo theo ngay.
+
+Giai doan 3: Tich hop camera va AI
+- Xin quyen camera.
+- Chup anh/chon anh tu thu vien.
+- Gui anh len AI.
+- Nhan ket qua mon an va calo.
+- Cho phep nguoi dung sua ket qua.
+- Them vao lich su.
+
+Giai doan 4: Thong ke va hoan thien UX
+- Ve bieu do calo theo ngay/tuan.
+- Hien thi muc tieu calo va calo con lai.
+- Them filter theo ngay/tuan/thang.
+- Hoan thien profile va setting.
+- Xu ly loading, empty state, error state.
+
+Giai doan 5: Hoan thien truoc khi demo
+- Kiem tra luong dang nhap/dang ky.
+- Kiem tra luong chup anh -> AI -> them vao lich su.
+- Kiem tra thong ke co cap nhat dung sau khi them/sua/xoa bua an.
+- Lam UI gon gang, de dung.
+- Test tren thiet bi that neu co.
+
+
+7. CAC MAN HINH TOI THIEU CHO BAN DEMO
+
+- Dang nhap.
+- Dang ky.
+- Thong ke chinh.
+- Chup anh.
+- Ket qua nhan dien mon an.
+- Profile/Setting.
+
+Neu muon demo nhanh, co the uu tien:
+- Dang nhap/dang ky co ban.
+- Chup anh/chon anh.
+- AI tra ve ten mon an va calo.
+- Them vao lich su.
+- Thong ke tong calo theo ngay.
+
