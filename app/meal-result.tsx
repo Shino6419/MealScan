@@ -58,10 +58,10 @@ function getInitialDate(value?: string) {
 }
 
 const MEAL_TYPE_OPTIONS = [
-  { value: 'breakfast', label: 'Bua sang', icon: 'sunny-outline' },
-  { value: 'lunch', label: 'Bua trua', icon: 'restaurant-outline' },
-  { value: 'afternoon', label: 'Bua chieu', icon: 'cafe-outline' },
-  { value: 'dinner', label: 'Bua toi', icon: 'moon-outline' },
+  { value: 'breakfast', label: 'Bữa sáng', icon: 'sunny-outline' },
+  { value: 'lunch', label: 'Bữa trưa', icon: 'restaurant-outline' },
+  { value: 'afternoon', label: 'Bữa chiều', icon: 'cafe-outline' },
+  { value: 'dinner', label: 'Bữa tối', icon: 'moon-outline' },
 ] as const;
 
 type MealType = (typeof MEAL_TYPE_OPTIONS)[number]['value'];
@@ -92,7 +92,7 @@ export default function MealResultScreen() {
   const [proteinPerServing, setProteinPerServing] = useState(0);
   const [fatPerServing, setFatPerServing] = useState(0);
   const [carbsPerServing, setCarbsPerServing] = useState(0);
-  const [servingUnit, setServingUnit] = useState('1 phan');
+  const [servingUnit, setServingUnit] = useState('1 phần');
   const [isSaving, setIsSaving] = useState(false);
   const [isPredicting, setIsPredicting] = useState(Boolean(imageUri));
   const [prediction, setPrediction] = useState<FoodPrediction | null>(null);
@@ -124,7 +124,7 @@ export default function MealResultScreen() {
         setFatPerServing(result.fat);
         setCarbsPerServing(result.carbs);
         setServingUnit(
-          FOOD_CALORIE_REFERENCES.find((item) => item.label === result.label)?.serving ?? '1 phan',
+          FOOD_CALORIE_REFERENCES.find((item) => item.label === result.label)?.serving ?? '1 phần',
         );
         setCalories(String(result.calories));
       } catch (error) {
@@ -133,7 +133,7 @@ export default function MealResultScreen() {
         }
 
         const message =
-          error instanceof Error ? error.message : 'Khong the chay model tren anh nay.';
+          error instanceof Error ? error.message : 'Không thể chạy model trên ảnh này.';
         setPredictionError(message);
       } finally {
         if (isActive) {
@@ -167,17 +167,17 @@ export default function MealResultScreen() {
     const totalCarbs = Number((carbsPerServing * quantityValue).toFixed(1));
 
     if (!foodName.trim()) {
-      Alert.alert('Thieu ten mon', 'Vui long nhap ten mon an.');
+      Alert.alert('Thiếu tên món', 'Vui lòng nhập tên món ăn.');
       return;
     }
 
     if (!Number.isFinite(quantityValue) || quantityValue <= 0) {
-      Alert.alert('So luong khong hop le', 'Vui long nhap so luong lon hon 0.');
+      Alert.alert('Số lượng không hợp lệ', 'Vui lòng nhập số lượng lớn hơn 0.');
       return;
     }
 
     if (!Number.isFinite(calorieValue) || calorieValue < 0) {
-      Alert.alert('Calo khong hop le', 'Vui long nhap so calo hop le.');
+      Alert.alert('Calo không hợp lệ', 'Vui lòng nhập số calo hợp lệ.');
       return;
     }
 
@@ -190,7 +190,7 @@ export default function MealResultScreen() {
 
     if (!userId) {
       setIsSaving(false);
-      Alert.alert('Chua dang nhap', 'Vui long dang nhap lai.');
+      Alert.alert('Chưa đăng nhập', 'Vui lòng đăng nhập lại.');
       router.replace('/login');
       return;
     }
@@ -207,8 +207,8 @@ export default function MealResultScreen() {
       carbs_g: totalCarbs,
       source: 'ai_scan',
       notes: caloriesPerServing
-        ? `So luong: ${quantityValue} x ${servingUnit}; ${caloriesPerServing} kcal, P ${formatMacro(proteinPerServing)}g, F ${formatMacro(fatPerServing)}g, C ${formatMacro(carbsPerServing)}g/${servingUnit}`
-        : `So luong: ${quantityValue}`,
+        ? `Số lượng: ${quantityValue} x ${servingUnit}; ${caloriesPerServing} kcal, P ${formatMacro(proteinPerServing)}g, F ${formatMacro(fatPerServing)}g, C ${formatMacro(carbsPerServing)}g/${servingUnit}`
+        : `Số lượng: ${quantityValue}`,
     };
 
     let { data: meal, error } = await safeRequest(
@@ -237,20 +237,20 @@ export default function MealResultScreen() {
     setIsSaving(false);
 
     if (error) {
-      Alert.alert('Luu that bai', error.message);
+      Alert.alert('Lưu thất bại', error.message);
       return;
     }
 
-    Alert.alert('Da them vao lich su', 'Mon an da duoc luu vao thong ke hom nay.', [
+    Alert.alert('Đã thêm vào lịch sử', 'Món ăn đã được lưu vào thống kê hôm nay.', [
       {
-        text: 'Xem chi tiet',
+        text: 'Xem chi tiết',
         onPress: () =>
           router.replace({
             pathname: '/meal-detail',
             params: { id: meal?.id },
           }),
       },
-      { text: 'Ve thong ke', onPress: () => router.replace('/(tabs)') },
+      { text: 'Về thống kê', onPress: () => router.replace('/(tabs)') },
     ]);
   }
 
@@ -264,21 +264,21 @@ export default function MealResultScreen() {
     <ScrollView contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
       <Pressable onPress={() => router.back()} style={styles.backButton}>
         <Ionicons name="chevron-back" size={22} color="#0f172a" />
-        <Text style={styles.backText}>Quay lai</Text>
+        <Text style={styles.backText}>Quay lại</Text>
       </Pressable>
 
       <View style={styles.header}>
         <View style={styles.headerStripe} />
         <View style={styles.headerTop}>
           <View>
-            <Text style={styles.kicker}>AI result</Text>
-            <Text style={styles.title}>Ket qua AI</Text>
+            <Text style={styles.kicker}>Kết quả AI</Text>
+            <Text style={styles.title}>Kết quả AI</Text>
           </View>
           <View style={styles.headerIcon}>
             <Ionicons name="sparkles-outline" size={26} color="#14B8A6" />
           </View>
         </View>
-        <Text style={styles.subtitle}>Kiem tra va sua ket qua truoc khi them vao lich su.</Text>
+        <Text style={styles.subtitle}>Kiểm tra và sửa kết quả trước khi thêm vào lịch sử.</Text>
       </View>
 
       {imageUri ? (
@@ -287,14 +287,14 @@ export default function MealResultScreen() {
           <View style={styles.imageBadge}>
             <Ionicons name="image-outline" size={16} color="#14B8A6" />
             <Text numberOfLines={1} style={styles.imageBadgeText}>
-              {imageName || 'Anh tu thu vien'}
+              {imageName || 'Ảnh từ thư viện'}
             </Text>
           </View>
         </View>
       ) : (
         <View style={styles.imagePlaceholder}>
           <Ionicons name="image-outline" size={42} color="#14B8A6" />
-          <Text style={styles.imageText}>Chua co anh mon an</Text>
+          <Text style={styles.imageText}>Chưa có ảnh món ăn</Text>
         </View>
       )}
 
@@ -303,8 +303,8 @@ export default function MealResultScreen() {
           <>
             <ActivityIndicator color="#14B8A6" />
             <View style={styles.predictionCopy}>
-              <Text style={styles.predictionTitle}>Dang phan tich mon an</Text>
-              <Text style={styles.predictionText}>Model dang xu ly anh 224x224...</Text>
+              <Text style={styles.predictionTitle}>Đang phân tích món ăn</Text>
+              <Text style={styles.predictionText}>Model đang xử lý ảnh 224x224...</Text>
             </View>
           </>
         ) : prediction ? (
@@ -312,10 +312,10 @@ export default function MealResultScreen() {
             <Ionicons name="sparkles-outline" size={22} color="#14B8A6" />
             <View style={styles.predictionCopy}>
               <Text style={styles.predictionTitle}>
-                Du doan: {prediction.label}
+                Dự đoán: {prediction.label}
               </Text>
               <Text style={styles.predictionText}>
-                Khoang {prediction.calories} kcal/{servingUnit} - P {formatMacro(prediction.protein)}g, F {formatMacro(prediction.fat)}g, C {formatMacro(prediction.carbs)}g.
+                Khoảng {prediction.calories} kcal/{servingUnit} - P {formatMacro(prediction.protein)}g, F {formatMacro(prediction.fat)}g, C {formatMacro(prediction.carbs)}g.
               </Text>
             </View>
           </>
@@ -323,7 +323,7 @@ export default function MealResultScreen() {
           <>
             <Ionicons name="warning-outline" size={22} color="#F97316" />
             <View style={styles.predictionCopy}>
-              <Text style={styles.predictionTitle}>Chua chay duoc model</Text>
+              <Text style={styles.predictionTitle}>Chưa chạy được model</Text>
               <Text style={styles.predictionText}>{predictionError}</Text>
             </View>
           </>
@@ -331,8 +331,8 @@ export default function MealResultScreen() {
           <>
             <Ionicons name="image-outline" size={22} color="#14B8A6" />
             <View style={styles.predictionCopy}>
-              <Text style={styles.predictionTitle}>Chua co anh de phan tich</Text>
-              <Text style={styles.predictionText}>Hay quay lai man hinh chup anh va chon anh mon an.</Text>
+              <Text style={styles.predictionTitle}>Chưa có ảnh để phân tích</Text>
+              <Text style={styles.predictionText}>Hãy quay lại màn hình chụp ảnh và chọn ảnh món ăn.</Text>
             </View>
           </>
         )}
@@ -340,10 +340,10 @@ export default function MealResultScreen() {
 
       <View style={styles.form}>
         <View style={styles.field}>
-          <Text style={styles.label}>Ten mon an</Text>
+          <Text style={styles.label}>Tên món ăn</Text>
           <TextInput
             onChangeText={setFoodName}
-            placeholder="Nhap ten mon"
+            placeholder="Nhập tên món"
             placeholderTextColor="#94a3b8"
             style={styles.input}
             value={foodName}
@@ -351,7 +351,7 @@ export default function MealResultScreen() {
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.label}>Khung bua an</Text>
+          <Text style={styles.label}>Khung bữa ăn</Text>
           <View style={styles.mealTypeGrid}>
             {MEAL_TYPE_OPTIONS.map((option) => {
               const isSelected = selectedMealType === option.value;
@@ -378,19 +378,19 @@ export default function MealResultScreen() {
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.label}>So luong</Text>
+          <Text style={styles.label}>Số lượng</Text>
           <TextInput
             keyboardType="decimal-pad"
             onChangeText={handleQuantityChange}
-            placeholder="Nhap so luong"
+            placeholder="Nhập số lượng"
             placeholderTextColor="#94a3b8"
             style={styles.input}
             value={quantity}
           />
           <Text style={styles.helperText}>
             {caloriesPerServing
-              ? `Moi ${servingUnit}: ${caloriesPerServing} kcal, Protein ${formatMacro(proteinPerServing)}g, Fat ${formatMacro(fatPerServing)}g, Carb ${formatMacro(carbsPerServing)}g.`
-              : 'Nhap so luong theo don vi cua mon an de tinh tong calo.'}
+              ? `Mỗi ${servingUnit}: ${caloriesPerServing} kcal, Protein ${formatMacro(proteinPerServing)}g, Fat ${formatMacro(fatPerServing)}g, Carb ${formatMacro(carbsPerServing)}g.`
+              : 'Nhập số lượng theo đơn vị của món ăn để tính tổng calo.'}
           </Text>
         </View>
 
@@ -410,11 +410,11 @@ export default function MealResultScreen() {
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.label}>Tong calo uoc tinh</Text>
+          <Text style={styles.label}>Tổng calo ước tính</Text>
           <TextInput
             keyboardType="number-pad"
             onChangeText={setCalories}
-            placeholder="Nhap calo"
+            placeholder="Nhập calo"
             placeholderTextColor="#94a3b8"
             style={styles.input}
             value={calories}
@@ -427,7 +427,7 @@ export default function MealResultScreen() {
           ) : (
             <>
               <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
-              <Text style={styles.primaryButtonText}>Them vao lich su</Text>
+              <Text style={styles.primaryButtonText}>Thêm vào lịch sử</Text>
             </>
           )}
         </Pressable>
