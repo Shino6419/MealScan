@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,9 +15,32 @@ import {
   View,
 } from 'react-native';
 
+import { safeRequest } from '@/utils/safeRequest';
 import { supabase } from '@/utils/supabase';
 
 const FORGOT_PASSWORD_ROUTE = '/forgot-password' as Href;
+
+type BodyProfileStatus = {
+  age_years: number | null;
+  fitness_goal: string | null;
+  gender: string | null;
+  height_cm: number | null;
+  protein_goal_g: number | null;
+  tdee_calories: number | null;
+  weight_kg: number | null;
+};
+
+function hasCompletedBodyProfile(profile: BodyProfileStatus | null) {
+  return Boolean(
+    profile?.age_years &&
+      profile.gender &&
+      profile.height_cm &&
+      profile.protein_goal_g &&
+      profile.tdee_calories &&
+      profile.weight_kg &&
+      profile.fitness_goal,
+  );
+}
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -32,25 +55,47 @@ export default function LoginScreen() {
 
   async function handleLogin() {
     if (!canSubmit) {
-      Alert.alert('Thieu thong tin', 'Vui long nhap email va mat khau.');
+      Alert.alert('Thiếu thông tin', 'Vui lòng nhập email và mật khẩu.');
       return;
     }
 
     setIsSubmitting(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-
-    setIsSubmitting(false);
+    const { data, error } = await supabase.auth
+      .signInWithPassword({
+        email: email.trim(),
+        password,
+      })
+      .catch((requestError: Error) => ({ data: { user: null, session: null }, error: requestError }));
 
     if (error) {
-      Alert.alert('Dang nhap that bai', error.message);
+      setIsSubmitting(false);
+      const message =
+        error.message === 'Network request failed'
+          ? 'Không kết nối được Supabase. Vui lòng kiểm tra mạng của emulator hoặc thử lại sau.'
+          : error.message;
+      Alert.alert('Đăng nhập thất bại', message);
       return;
     }
 
-    router.replace('/(tabs)');
+    if (!data.user) {
+      setIsSubmitting(false);
+      router.replace('/login');
+      return;
+    }
+
+    const { data: profile } = await safeRequest(
+      supabase
+        .from('profiles')
+        .select('age_years, gender, height_cm, weight_kg, fitness_goal, tdee_calories, protein_goal_g')
+        .eq('id', data.user.id)
+        .maybeSingle(),
+      { data: null },
+    );
+
+    setIsSubmitting(false);
+
+    router.replace(hasCompletedBodyProfile(profile as BodyProfileStatus | null) ? '/(tabs)' : '/body-profile');
   }
 
   return (
@@ -66,13 +111,13 @@ export default function LoginScreen() {
           <View style={styles.headerTop}>
             <View>
               <Text style={styles.kicker}>MealScan</Text>
-              <Text style={styles.title}>Dang nhap</Text>
+              <Text style={styles.title}>Đăng nhập</Text>
             </View>
             <View style={styles.logoMark}>
               <Ionicons name="scan" size={26} color="#14B8A6" />
             </View>
           </View>
-          <Text style={styles.subtitle}>Theo doi luong calo moi ngay tu mon an cua ban.</Text>
+          <Text style={styles.subtitle}>Theo dõi lượng calo mỗi ngày từ món ăn của bạn.</Text>
         </View>
 
         <View style={styles.form}>
@@ -101,7 +146,7 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Mat khau</Text>
+            <Text style={styles.label}>Mật khẩu</Text>
             <Pressable onPress={() => passwordInputRef.current?.focus()} style={styles.inputWrap}>
               <Ionicons name="lock-closed-outline" size={20} color="#64748b" />
               <TextInput
@@ -111,7 +156,7 @@ export default function LoginScreen() {
                 editable={!isSubmitting}
                 onChangeText={setPassword}
                 onSubmitEditing={handleLogin}
-                placeholder="Nhap mat khau"
+                placeholder="Nhập mật khẩu"
                 placeholderTextColor="#94a3b8"
                 returnKeyType="done"
                 secureTextEntry={!isPasswordVisible}
@@ -121,7 +166,7 @@ export default function LoginScreen() {
                 value={password}
               />
               <Pressable
-                accessibilityLabel={isPasswordVisible ? 'An mat khau' : 'Hien mat khau'}
+                accessibilityLabel={isPasswordVisible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                 hitSlop={10}
                 onPress={() => setIsPasswordVisible((current) => !current)}>
                 <Ionicons
@@ -134,7 +179,7 @@ export default function LoginScreen() {
           </View>
 
           <Pressable onPress={() => router.push(FORGOT_PASSWORD_ROUTE)} style={styles.forgotButton}>
-            <Text style={styles.forgotText}>Quen mat khau?</Text>
+            <Text style={styles.forgotText}>Quên mật khẩu?</Text>
           </Pressable>
 
           <Pressable
@@ -149,15 +194,15 @@ export default function LoginScreen() {
               <ActivityIndicator color="#fff" />
             ) : (
               <>
-                <Text style={styles.loginButtonText}>Dang nhap</Text>
+                <Text style={styles.loginButtonText}>Đăng nhập</Text>
                 <Ionicons name="arrow-forward" size={20} color="#fff" />
               </>
             )}
           </Pressable>
 
           <Pressable onPress={() => router.push('/register')} style={styles.secondaryAction}>
-            <Text style={styles.secondaryText}>Chua co tai khoan?</Text>
-            <Text style={styles.secondaryLink}>Dang ky</Text>
+            <Text style={styles.secondaryText}>Chưa có tài khoản?</Text>
+            <Text style={styles.secondaryLink}>Đăng ký</Text>
           </Pressable>
         </View>
       </ScrollView>

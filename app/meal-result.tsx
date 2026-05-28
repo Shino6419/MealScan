@@ -13,22 +13,30 @@ import {
   View,
 } from 'react-native';
 
-import { supabase } from '@/utils/supabase';
 import {
   classifyFoodImage,
   FOOD_CALORIE_REFERENCES,
   type FoodPrediction,
 } from '@/utils/foodClassifier';
-import { AUTH_DISABLED } from '@/constants/app-config';
+import { safeRequest } from '@/utils/safeRequest';
+import { supabase } from '@/utils/supabase';
 
-function getTodayKey() {
-  return new Date().toISOString().slice(0, 10);
+function formatDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
 }
 
-function getAutoMealType() {
-  const hour = new Date().getHours();
+function getMealTypeFromDate(date: Date) {
+  const hour = date.getHours();
 
-  if (hour < 10) {
+  if (hour < 4) {
+    return 'dinner';
+  }
+
+  if (hour >= 4 && hour < 10) {
     return 'breakfast';
   }
 
@@ -36,22 +44,54 @@ function getAutoMealType() {
     return 'lunch';
   }
 
-  if (hour < 21) {
-    return 'dinner';
+  if (hour < 18) {
+    return 'afternoon';
   }
 
-  return 'snack';
+  return 'dinner';
+}
+
+function getInitialDate(value?: string) {
+  const parsedDate = value ? new Date(value) : new Date();
+
+  return Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+}
+
+const MEAL_TYPE_OPTIONS = [
+  { value: 'breakfast', label: 'Bua sang', icon: 'sunny-outline' },
+  { value: 'lunch', label: 'Bua trua', icon: 'restaurant-outline' },
+  { value: 'afternoon', label: 'Bua chieu', icon: 'cafe-outline' },
+  { value: 'dinner', label: 'Bua toi', icon: 'moon-outline' },
+] as const;
+
+type MealType = (typeof MEAL_TYPE_OPTIONS)[number]['value'];
+
+function formatMacro(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
 export default function MealResultScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ imageName?: string; imageUri?: string }>();
+  const params = useLocalSearchParams<{
+    imageName?: string;
+    imageUri?: string;
+    scannedAt?: string;
+  }>();
   const imageUri = typeof params.imageUri === 'string' ? params.imageUri : '';
   const imageName = typeof params.imageName === 'string' ? params.imageName : '';
+  const [scanDate] = useState(() =>
+    getInitialDate(typeof params.scannedAt === 'string' ? params.scannedAt : undefined),
+  );
   const [foodName, setFoodName] = useState('');
   const [calories, setCalories] = useState('');
   const [quantity, setQuantity] = useState('1');
+  const [selectedMealType, setSelectedMealType] = useState<MealType>(
+    () => getMealTypeFromDate(scanDate),
+  );
   const [caloriesPerServing, setCaloriesPerServing] = useState<number | null>(null);
+  const [proteinPerServing, setProteinPerServing] = useState(0);
+  const [fatPerServing, setFatPerServing] = useState(0);
+  const [carbsPerServing, setCarbsPerServing] = useState(0);
   const [servingUnit, setServingUnit] = useState('1 phan');
   const [isSaving, setIsSaving] = useState(false);
   const [isPredicting, setIsPredicting] = useState(Boolean(imageUri));
@@ -80,6 +120,9 @@ export default function MealResultScreen() {
         setPrediction(result);
         setFoodName(result.label);
         setCaloriesPerServing(result.calories);
+        setProteinPerServing(result.protein);
+        setFatPerServing(result.fat);
+        setCarbsPerServing(result.carbs);
         setServingUnit(
           FOOD_CALORIE_REFERENCES.find((item) => item.label === result.label)?.serving ?? '1 phan',
         );
@@ -119,6 +162,9 @@ export default function MealResultScreen() {
   async function handleSaveMeal() {
     const calorieValue = Number(calories);
     const quantityValue = Number(quantity);
+    const totalProtein = Number((proteinPerServing * quantityValue).toFixed(1));
+    const totalFat = Number((fatPerServing * quantityValue).toFixed(1));
+    const totalCarbs = Number((carbsPerServing * quantityValue).toFixed(1));
 
     if (!foodName.trim()) {
       Alert.alert('Thieu ten mon', 'Vui long nhap ten mon an.');
@@ -137,15 +183,9 @@ export default function MealResultScreen() {
 
     setIsSaving(true);
 
-    if (AUTH_DISABLED) {
-      setIsSaving(false);
-      Alert.alert('Da them vao lich su demo', 'Dang nhap Supabase dang tam tat nen mon an chua luu len server.', [
-        { text: 'Ve thong ke', onPress: () => router.replace('/(tabs)') },
-      ]);
-      return;
-    }
-
-    const { data: authData } = await supabase.auth.getUser();
+    const { data: authData } = await supabase.auth
+      .getUser()
+      .catch(() => ({ data: { user: null } }));
     const userId = authData.user?.id;
 
     if (!userId) {
@@ -155,23 +195,44 @@ export default function MealResultScreen() {
       return;
     }
 
-    const now = new Date().toISOString();
-    const { data: meal, error } = await supabase
-      .from('meals')
-      .insert({
-        user_id: userId,
-        meal_date: getTodayKey(),
-        eaten_at: now,
-        meal_type: getAutoMealType(),
-        food_name: foodName.trim(),
-        calories: calorieValue,
-        source: 'ai_scan',
-        notes: caloriesPerServing
-          ? `So luong: ${quantityValue} x ${servingUnit}; uoc tinh ${caloriesPerServing} kcal/${servingUnit}`
-          : `So luong: ${quantityValue}`,
-      })
-      .select('id')
-      .single();
+    const mealPayload = {
+      user_id: userId,
+      meal_date: formatDateKey(scanDate),
+      eaten_at: scanDate.toISOString(),
+      meal_type: selectedMealType,
+      food_name: foodName.trim(),
+      calories: calorieValue,
+      protein_g: totalProtein,
+      fat_g: totalFat,
+      carbs_g: totalCarbs,
+      source: 'ai_scan',
+      notes: caloriesPerServing
+        ? `So luong: ${quantityValue} x ${servingUnit}; ${caloriesPerServing} kcal, P ${formatMacro(proteinPerServing)}g, F ${formatMacro(fatPerServing)}g, C ${formatMacro(carbsPerServing)}g/${servingUnit}`
+        : `So luong: ${quantityValue}`,
+    };
+
+    let { data: meal, error } = await safeRequest(
+      supabase
+        .from('meals')
+        .insert(mealPayload)
+        .select('id')
+        .single(),
+      { data: null, error: new Error('Network request failed') },
+    );
+
+    if (error?.message.includes('meals_meal_type_check') && selectedMealType === 'afternoon') {
+      const fallbackResult = await safeRequest(
+        supabase
+          .from('meals')
+          .insert({ ...mealPayload, meal_type: 'snack' })
+          .select('id')
+          .single(),
+        { data: null, error: new Error('Network request failed') },
+      );
+
+      meal = fallbackResult.data;
+      error = fallbackResult.error;
+    }
 
     setIsSaving(false);
 
@@ -186,12 +247,18 @@ export default function MealResultScreen() {
         onPress: () =>
           router.replace({
             pathname: '/meal-detail',
-            params: { id: meal.id },
+            params: { id: meal?.id },
           }),
       },
       { text: 'Ve thong ke', onPress: () => router.replace('/(tabs)') },
     ]);
   }
+
+  const quantityValue = Number(quantity);
+  const displayQuantity = Number.isFinite(quantityValue) && quantityValue > 0 ? quantityValue : 1;
+  const totalProtein = proteinPerServing * displayQuantity;
+  const totalFat = fatPerServing * displayQuantity;
+  const totalCarbs = carbsPerServing * displayQuantity;
 
   return (
     <ScrollView contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
@@ -248,7 +315,7 @@ export default function MealResultScreen() {
                 Du doan: {prediction.label}
               </Text>
               <Text style={styles.predictionText}>
-                Khoang {prediction.calories} kcal/{servingUnit} - do tin cay {Math.round(prediction.confidence * 100)}%.
+                Khoang {prediction.calories} kcal/{servingUnit} - P {formatMacro(prediction.protein)}g, F {formatMacro(prediction.fat)}g, C {formatMacro(prediction.carbs)}g.
               </Text>
             </View>
           </>
@@ -284,6 +351,33 @@ export default function MealResultScreen() {
         </View>
 
         <View style={styles.field}>
+          <Text style={styles.label}>Khung bua an</Text>
+          <View style={styles.mealTypeGrid}>
+            {MEAL_TYPE_OPTIONS.map((option) => {
+              const isSelected = selectedMealType === option.value;
+
+              return (
+                <Pressable
+                  key={option.value}
+                  onPress={() => setSelectedMealType(option.value)}
+                  style={[styles.mealTypeButton, isSelected && styles.mealTypeButtonSelected]}>
+                  <Ionicons
+                    name={option.icon}
+                    size={19}
+                    color={isSelected ? '#fff' : '#14B8A6'}
+                  />
+                  <View style={styles.mealTypeCopy}>
+                    <Text style={[styles.mealTypeLabel, isSelected && styles.mealTypeTextSelected]}>
+                      {option.label}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.field}>
           <Text style={styles.label}>So luong</Text>
           <TextInput
             keyboardType="decimal-pad"
@@ -295,9 +389,24 @@ export default function MealResultScreen() {
           />
           <Text style={styles.helperText}>
             {caloriesPerServing
-              ? `AI uoc tinh ${caloriesPerServing} kcal cho ${servingUnit}. Tong calo se tinh theo so luong.`
+              ? `Moi ${servingUnit}: ${caloriesPerServing} kcal, Protein ${formatMacro(proteinPerServing)}g, Fat ${formatMacro(fatPerServing)}g, Carb ${formatMacro(carbsPerServing)}g.`
               : 'Nhap so luong theo don vi cua mon an de tinh tong calo.'}
           </Text>
+        </View>
+
+        <View style={styles.nutritionGrid}>
+          <View style={styles.nutritionTile}>
+            <Text style={styles.nutritionLabel}>Protein</Text>
+            <Text style={styles.nutritionValue}>{formatMacro(totalProtein)}g</Text>
+          </View>
+          <View style={styles.nutritionTile}>
+            <Text style={styles.nutritionLabel}>Fat</Text>
+            <Text style={styles.nutritionValue}>{formatMacro(totalFat)}g</Text>
+          </View>
+          <View style={styles.nutritionTile}>
+            <Text style={styles.nutritionLabel}>Carb</Text>
+            <Text style={styles.nutritionValue}>{formatMacro(totalCarbs)}g</Text>
+          </View>
         </View>
 
         <View style={styles.field}>
@@ -502,6 +611,60 @@ const styles = StyleSheet.create({
     fontSize: 16,
     minHeight: 54,
     paddingHorizontal: 14,
+  },
+  mealTypeGrid: {
+    gap: 8,
+  },
+  mealTypeButton: {
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderColor: '#CCFBF1',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    minHeight: 58,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  mealTypeButtonSelected: {
+    backgroundColor: '#14B8A6',
+    borderColor: '#14B8A6',
+  },
+  mealTypeCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  mealTypeLabel: {
+    color: '#0f172a',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  mealTypeTextSelected: {
+    color: '#fff',
+  },
+  nutritionGrid: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  nutritionTile: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#CCFBF1',
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    padding: 10,
+  },
+  nutritionLabel: {
+    color: '#64748B',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  nutritionValue: {
+    color: '#0f172a',
+    fontSize: 16,
+    fontWeight: '800',
+    marginTop: 4,
   },
   helperText: {
     color: '#64748B',

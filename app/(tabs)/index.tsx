@@ -10,16 +10,19 @@ import {
   View,
 } from 'react-native';
 
-import { AUTH_DISABLED } from '@/constants/app-config';
+import { safeRequest } from '@/utils/safeRequest';
+import { ACTIVITY_LABELS, FITNESS_GOAL_LABELS, type ActivityLevel, type FitnessGoal } from '@/utils/nutritionGoals';
 import { supabase } from '@/utils/supabase';
 
 type Meal = {
+  carbs_g: number | null;
   id: string;
+  fat_g: number | null;
   food_name: string;
   calories: number;
   meal_type: string;
+  protein_g: number | null;
   eaten_at: string;
-  isDemo?: boolean;
 };
 
 type DailySummary = {
@@ -36,6 +39,18 @@ type CalendarDay = {
   isCurrentMonth: boolean;
 };
 
+type ProfileMetrics = {
+  activity_level: ActivityLevel | null;
+  bmi: number | null;
+  bmr_calories: number | null;
+  carbs_goal_g: number | null;
+  daily_calorie_goal: number | null;
+  fat_goal_g: number | null;
+  fitness_goal: FitnessGoal | null;
+  protein_goal_g: number | null;
+  tdee_calories: number | null;
+};
+
 const COLORS = {
   primary: '#14B8A6',
   accent: '#38BDF8',
@@ -48,17 +63,10 @@ const COLORS = {
 
 const WEEKDAY_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 const MEAL_SECTIONS = [
-  { key: 'breakfast', title: 'Bua sang', icon: 'sunny-outline' },
-  { key: 'lunch', title: 'Bua trua', icon: 'restaurant-outline' },
-  { key: 'dinner', title: 'Bua toi', icon: 'moon-outline' },
-  { key: 'snack', title: 'An nhe', icon: 'cafe-outline' },
-] as const;
-
-const DEMO_MEAL_TEMPLATES = [
-  { food_name: 'Banh mi', calories: 450, meal_type: 'breakfast', hour: 7, minute: 30 },
-  { food_name: 'Com tam', calories: 650, meal_type: 'lunch', hour: 12, minute: 15 },
-  { food_name: 'Goi cuon', calories: 190, meal_type: 'snack', hour: 16, minute: 20 },
-  { food_name: 'Pho', calories: 480, meal_type: 'dinner', hour: 19, minute: 5 },
+  { key: 'breakfast', title: 'Bữa sáng', icon: 'sunny-outline' },
+  { key: 'lunch', title: 'Bữa trưa', icon: 'restaurant-outline' },
+  { key: 'afternoon', title: 'Bữa chiều', icon: 'cafe-outline' },
+  { key: 'dinner', title: 'Bữa tối', icon: 'moon-outline' },
 ] as const;
 
 function startOfDay(date: Date) {
@@ -101,11 +109,8 @@ function getCalendarDays(visibleMonth: Date) {
   });
 }
 
-function formatTime(value: string) {
-  return new Date(value).toLocaleTimeString('vi-VN', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+function normalizeMealType(mealType: string) {
+  return mealType === 'snack' ? 'afternoon' : mealType;
 }
 
 function formatDisplayDate(date: Date) {
@@ -124,28 +129,13 @@ function formatMonthTitle(date: Date) {
   });
 }
 
-function getDemoMeals(date: Date): Meal[] {
-  return DEMO_MEAL_TEMPLATES.map((meal, index) => {
-    const eatenAt = new Date(date);
-    eatenAt.setHours(meal.hour, meal.minute, 0, 0);
-
-    return {
-      id: `demo-${index}`,
-      food_name: meal.food_name,
-      calories: meal.calories,
-      meal_type: meal.meal_type,
-      eaten_at: eatenAt.toISOString(),
-      isDemo: true,
-    };
-  });
-}
-
 export default function StatsScreen() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [summary, setSummary] = useState<DailySummary | null>(null);
   const [weeklySummaries, setWeeklySummaries] = useState<DailySummary[]>([]);
   const [dailyGoal, setDailyGoal] = useState(2000);
+  const [profileMetrics, setProfileMetrics] = useState<ProfileMetrics | null>(null);
   const [meals, setMeals] = useState<Meal[]>([]);
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
   const [visibleMonth, setVisibleMonth] = useState(() => startOfDay(new Date()));
@@ -166,19 +156,20 @@ export default function StatsScreen() {
     [weekStart]
   );
   const calendarDays = useMemo(() => getCalendarDays(visibleMonth), [visibleMonth]);
-  const demoMeals = useMemo(() => getDemoMeals(selectedDate), [selectedDate]);
-  const displayedMeals = meals.length > 0 || isLoading ? meals : demoMeals;
-  const isShowingDemoMeals = meals.length === 0 && !isLoading;
   const realMealTotal = meals.reduce((total, meal) => total + meal.calories, 0);
-  const displayedDemoTotal = isShowingDemoMeals
-    ? displayedMeals.reduce((total, meal) => total + meal.calories, 0)
-    : 0;
+  const macroTotals = meals.reduce(
+    (totals, meal) => ({
+      carbs: totals.carbs + (meal.carbs_g ?? 0),
+      fat: totals.fat + (meal.fat_g ?? 0),
+      protein: totals.protein + (meal.protein_g ?? 0),
+    }),
+    { carbs: 0, fat: 0, protein: 0 },
+  );
   const weeklyTotal =
     weeklySummaries.reduce((total, item) => total + item.total_calories, 0) ||
-    realMealTotal ||
-    displayedDemoTotal;
-  const totalCalories = summary?.total_calories ?? (realMealTotal || displayedDemoTotal);
-  const goal = summary?.calorie_goal ?? dailyGoal;
+    realMealTotal;
+  const totalCalories = summary?.total_calories ?? realMealTotal;
+  const goal = dailyGoal || summary?.calorie_goal || 2000;
   const remainingCalories = Math.max(goal - totalCalories, 0);
   const progress = goal > 0 ? Math.min(totalCalories / goal, 1) : 0;
   const isToday = selectedDateKey === todayKey;
@@ -190,18 +181,9 @@ export default function StatsScreen() {
       async function loadDashboard() {
         setIsLoading(true);
 
-        if (AUTH_DISABLED) {
-          if (isMounted) {
-            setDailyGoal(2000);
-            setSummary(null);
-            setWeeklySummaries([]);
-            setMeals([]);
-            setIsLoading(false);
-          }
-          return;
-        }
-
-        const { data: authData } = await supabase.auth.getUser();
+        const { data: authData } = await supabase.auth
+          .getUser()
+          .catch(() => ({ data: { user: null } }));
         const userId = authData.user?.id;
 
         if (!userId) {
@@ -214,34 +196,47 @@ export default function StatsScreen() {
         const weekEnd = addDays(weekStart, 6);
         const [{ data: profileData }, { data: summaryData }, { data: weeklyData }, { data: mealData }] =
           await Promise.all([
-            supabase
-              .from('profiles')
-              .select('daily_calorie_goal')
-              .eq('id', userId)
-              .maybeSingle(),
-            supabase
-              .from('daily_summaries')
-              .select('total_calories, meal_count, calorie_goal')
-              .eq('user_id', userId)
-              .eq('summary_date', selectedDateKey)
-              .maybeSingle(),
-            supabase
-              .from('daily_summaries')
-              .select('summary_date, total_calories, meal_count, calorie_goal')
-              .eq('user_id', userId)
-              .gte('summary_date', formatDateKey(weekStart))
-              .lte('summary_date', formatDateKey(weekEnd))
-              .order('summary_date', { ascending: true }),
-            supabase
-              .from('meals')
-              .select('id, food_name, calories, meal_type, eaten_at')
-              .eq('user_id', userId)
-              .eq('meal_date', selectedDateKey)
-              .order('eaten_at', { ascending: true }),
+            safeRequest(
+              supabase
+                .from('profiles')
+                .select('daily_calorie_goal, bmi, bmr_calories, tdee_calories, protein_goal_g, fat_goal_g, carbs_goal_g, fitness_goal, activity_level')
+                .eq('id', userId)
+                .maybeSingle(),
+              { data: null },
+            ),
+            safeRequest(
+              supabase
+                .from('daily_summaries')
+                .select('total_calories, meal_count, calorie_goal')
+                .eq('user_id', userId)
+                .eq('summary_date', selectedDateKey)
+                .maybeSingle(),
+              { data: null },
+            ),
+            safeRequest(
+              supabase
+                .from('daily_summaries')
+                .select('summary_date, total_calories, meal_count, calorie_goal')
+                .eq('user_id', userId)
+                .gte('summary_date', formatDateKey(weekStart))
+                .lte('summary_date', formatDateKey(weekEnd))
+                .order('summary_date', { ascending: true }),
+              { data: [] },
+            ),
+            safeRequest(
+              supabase
+                .from('meals')
+                .select('id, food_name, calories, protein_g, fat_g, carbs_g, meal_type, eaten_at')
+                .eq('user_id', userId)
+                .eq('meal_date', selectedDateKey)
+                .order('eaten_at', { ascending: true }),
+              { data: [] },
+            ),
           ]);
 
         if (isMounted) {
           setDailyGoal(profileData?.daily_calorie_goal ?? 2000);
+          setProfileMetrics((profileData as ProfileMetrics | null) ?? null);
           setSummary(summaryData ?? null);
           setWeeklySummaries(weeklyData ?? []);
           setMeals(mealData ?? []);
@@ -258,10 +253,6 @@ export default function StatsScreen() {
   );
 
   function getCaloriesForDate(dateKey: string) {
-    if (isShowingDemoMeals && dateKey === selectedDateKey) {
-      return displayedDemoTotal;
-    }
-
     return weeklySummaries.find((item) => item.summary_date === dateKey)?.total_calories ?? 0;
   }
 
@@ -281,13 +272,13 @@ export default function StatsScreen() {
         <View style={styles.heroTop}>
           <View>
             <Text style={styles.kicker}>Meal diary</Text>
-            <Text style={styles.title}>Nhat ky calo</Text>
+            <Text style={styles.title}>Nhật ký calo</Text>
           </View>
           <View style={styles.heroIcon}>
             <Ionicons name="nutrition-outline" size={26} color={COLORS.primary} />
           </View>
         </View>
-        <Text style={styles.subtitle}>Chon ngay tren lich va xem tung bua an trong ngay do.</Text>
+        <Text style={styles.subtitle}>Chọn ngày trên lịch và xem từng bữa ăn trong ngày đó.</Text>
       </View>
 
       <View style={styles.weekStrip}>
@@ -321,7 +312,7 @@ export default function StatsScreen() {
       <View style={styles.summaryBox}>
         <View style={styles.summaryTop}>
           <View>
-            <Text style={styles.summaryLabel}>{isToday ? 'Hom nay' : formatDisplayDate(selectedDate)}</Text>
+            <Text style={styles.summaryLabel}>{isToday ? 'Hôm nay' : formatDisplayDate(selectedDate)}</Text>
             <Text style={styles.summaryValue}>{totalCalories} kcal</Text>
           </View>
           {isLoading ? <ActivityIndicator color={COLORS.primary} /> : null}
@@ -334,50 +325,128 @@ export default function StatsScreen() {
         <View style={styles.summaryGrid}>
           <View style={styles.metricCard}>
             <Ionicons name="flag-outline" size={18} color={COLORS.primary} />
-            <Text style={styles.metricLabel}>Muc tieu</Text>
+            <Text style={styles.metricLabel}>Mục tiêu</Text>
             <Text style={styles.metricValue}>{goal}</Text>
           </View>
           <View style={styles.metricCard}>
             <Ionicons name="battery-half-outline" size={18} color={COLORS.primary} />
-            <Text style={styles.metricLabel}>Con lai</Text>
+            <Text style={styles.metricLabel}>Còn lại</Text>
             <Text style={styles.metricValue}>{remainingCalories}</Text>
           </View>
           <View style={styles.metricCard}>
             <Ionicons name="restaurant-outline" size={18} color={COLORS.primary} />
-            <Text style={styles.metricLabel}>So mon</Text>
-            <Text style={styles.metricValue}>{summary?.meal_count ?? displayedMeals.length}</Text>
+            <Text style={styles.metricLabel}>Số món</Text>
+            <Text style={styles.metricValue}>{summary?.meal_count ?? meals.length}</Text>
+          </View>
+        </View>
+
+        <View style={styles.summaryGrid}>
+          <View style={styles.metricCard}>
+            <Ionicons name="pulse-outline" size={18} color={COLORS.primary} />
+            <Text style={styles.metricLabel}>BMR</Text>
+            <Text style={styles.metricValue}>{profileMetrics?.bmr_calories ?? '--'}</Text>
+          </View>
+          <View style={styles.metricCard}>
+            <Ionicons name="flame-outline" size={18} color={COLORS.primary} />
+            <Text style={styles.metricLabel}>TDEE</Text>
+            <Text style={styles.metricValue}>{profileMetrics?.tdee_calories ?? '--'}</Text>
+          </View>
+          <View style={styles.metricCard}>
+            <Ionicons name="body-outline" size={18} color={COLORS.primary} />
+            <Text style={styles.metricLabel}>BMI</Text>
+            <Text style={styles.metricValue}>
+              {profileMetrics?.bmi == null ? '--' : Number(profileMetrics.bmi).toFixed(1)}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.goalInfoRow}>
+          <View style={styles.goalInfoItem}>
+            <Text style={styles.goalInfoLabel}>Mục tiêu</Text>
+            <Text style={styles.goalInfoValue}>
+              {profileMetrics?.fitness_goal
+                ? FITNESS_GOAL_LABELS[profileMetrics.fitness_goal]
+                : 'Chưa đặt'}
+            </Text>
+          </View>
+          <View style={styles.goalInfoItem}>
+            <Text style={styles.goalInfoLabel}>Vận động</Text>
+            <Text style={styles.goalInfoValue}>
+              {profileMetrics?.activity_level
+                ? ACTIVITY_LABELS[profileMetrics.activity_level]
+                : 'Chưa đặt'}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.macroSection}>
+          <Text style={styles.macroSectionTitle}>Dinh dưỡng còn lại</Text>
+          <View style={styles.macroGrid}>
+            <View style={styles.macroCard}>
+              <Text style={styles.macroLabel}>Protein</Text>
+              <Text style={styles.macroValue}>
+                {Math.round(macroTotals.protein)} / {profileMetrics?.protein_goal_g ?? '--'}g
+              </Text>
+              <Text style={styles.macroRemain}>
+                Còn {profileMetrics?.protein_goal_g == null ? '--' : Math.max(profileMetrics.protein_goal_g - Math.round(macroTotals.protein), 0)}g
+              </Text>
+            </View>
+            <View style={styles.macroCard}>
+              <Text style={styles.macroLabel}>Fat</Text>
+              <Text style={styles.macroValue}>
+                {Math.round(macroTotals.fat)} / {profileMetrics?.fat_goal_g ?? '--'}g
+              </Text>
+              <Text style={styles.macroRemain}>
+                Còn {profileMetrics?.fat_goal_g == null ? '--' : Math.max(profileMetrics.fat_goal_g - Math.round(macroTotals.fat), 0)}g
+              </Text>
+            </View>
+            <View style={styles.macroCard}>
+              <Text style={styles.macroLabel}>Carb</Text>
+              <Text style={styles.macroValue}>
+                {Math.round(macroTotals.carbs)} / {profileMetrics?.carbs_goal_g ?? '--'}g
+              </Text>
+              <Text style={styles.macroRemain}>
+                Còn {profileMetrics?.carbs_goal_g == null ? '--' : Math.max(profileMetrics.carbs_goal_g - Math.round(macroTotals.carbs), 0)}g
+              </Text>
+            </View>
           </View>
         </View>
       </View>
 
       <View style={styles.sectionHeader}>
         <View>
-          <Text style={styles.sectionTitle}>Timeline bua an</Text>
-          <Text style={styles.sectionSubtitle}>
-            {isShowingDemoMeals ? 'Du lieu mau: ' : 'Tong tuan nay: '}
-            {weeklyTotal} kcal
-          </Text>
+          <Text style={styles.sectionTitle}>Timeline bữa ăn</Text>
+          <Text style={styles.sectionSubtitle}>Tổng tuần này: {weeklyTotal} kcal</Text>
         </View>
-        <Pressable onPress={() => router.push('/(tabs)/camera')} style={styles.addButton}>
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: '/manual-meal',
+              params: { mealDate: selectedDateKey },
+            })
+          }
+          style={styles.addButton}>
           <Ionicons name="add" size={18} color="#fff" />
-          <Text style={styles.addButtonText}>Them</Text>
+          <Text style={styles.addButtonText}>Thêm</Text>
         </Pressable>
       </View>
 
       <View style={styles.timelineCard}>
-        {displayedMeals.length === 0 ? (
+        {meals.length === 0 ? (
           <View style={styles.emptyBox}>
             <View style={styles.emptyDecoration}>
               <View style={styles.emptyLine} />
               <Ionicons name="calendar-clear-outline" size={30} color={COLORS.primary} />
               <View style={styles.emptyLine} />
             </View>
-            <Text style={styles.emptyTitle}>Chua co mon an</Text>
-            <Text style={styles.emptyText}>Ngay nay chua co mon an nao trong lich su.</Text>
+            <Text style={styles.emptyTitle}>Chưa có món ăn</Text>
+            <Text style={styles.emptyText}>Ngày này chưa có món ăn nào trong lịch sử.</Text>
           </View>
         ) : (
           MEAL_SECTIONS.map((section) => {
-            const sectionMeals = displayedMeals.filter((meal) => meal.meal_type === section.key);
+            const sectionMeals = meals.filter(
+              (meal) => normalizeMealType(meal.meal_type) === section.key,
+            );
 
             return (
               <View key={section.key} style={styles.timelineSection}>
@@ -391,16 +460,12 @@ export default function StatsScreen() {
                 <View style={styles.timelineContent}>
                   <Text style={styles.timelineTitle}>{section.title}</Text>
                   {sectionMeals.length === 0 ? (
-                    <Text style={styles.timelineEmpty}>Chua co mon</Text>
+                    <Text style={styles.timelineEmpty}>Chưa có món</Text>
                   ) : (
                     sectionMeals.map((meal) => (
                       <Pressable
                         key={meal.id}
                         onPress={() => {
-                          if (meal.isDemo) {
-                            return;
-                          }
-
                           router.push({
                             pathname: '/meal-detail',
                             params: { id: meal.id },
@@ -409,10 +474,6 @@ export default function StatsScreen() {
                         style={styles.mealItem}>
                         <View style={styles.mealInfo}>
                           <Text style={styles.mealName}>{meal.food_name}</Text>
-                          <Text style={styles.mealMeta}>
-                            {formatTime(meal.eaten_at)}
-                            {meal.isDemo ? ' - mon mau' : ''}
-                          </Text>
                         </View>
                         <Text style={styles.mealCalories}>{meal.calories} kcal</Text>
                       </Pressable>
@@ -645,6 +706,71 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: 3,
   },
+  goalInfoRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+  },
+  goalInfoItem: {
+    backgroundColor: '#ECFEFF',
+    borderColor: COLORS.line,
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    padding: 10,
+  },
+  goalInfoLabel: {
+    color: COLORS.muted,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  goalInfoValue: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: '900',
+    marginTop: 4,
+  },
+  macroSection: {
+    borderTopColor: COLORS.line,
+    borderTopWidth: 1,
+    marginTop: 14,
+    paddingTop: 14,
+  },
+  macroSectionTitle: {
+    color: COLORS.text,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  macroGrid: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+  },
+  macroCard: {
+    backgroundColor: '#F8FAFC',
+    borderColor: COLORS.line,
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    padding: 10,
+  },
+  macroLabel: {
+    color: COLORS.muted,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  macroValue: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: '900',
+    marginTop: 5,
+  },
+  macroRemain: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 4,
+  },
   sectionHeader: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -745,11 +871,6 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: 16,
     fontWeight: '800',
-  },
-  mealMeta: {
-    color: COLORS.muted,
-    fontSize: 13,
-    marginTop: 3,
   },
   mealCalories: {
     color: COLORS.primary,

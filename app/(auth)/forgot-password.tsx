@@ -27,24 +27,30 @@ export default function ForgotPasswordScreen() {
 
   async function handleSendResetEmail() {
     if (!canSubmit) {
-      Alert.alert('Thieu email', 'Vui long nhap email tai khoan cua ban.');
+      Alert.alert('Thiếu email', 'Vui lòng nhập email tài khoản của bạn.');
       return;
     }
 
     setIsSubmitting(true);
 
-    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail);
+    const { error } = await supabase.auth
+      .resetPasswordForEmail(normalizedEmail)
+      .catch((requestError: Error) => ({ error: requestError }));
 
     setIsSubmitting(false);
 
     if (error) {
-      Alert.alert('Gui email that bai', error.message);
+      const message =
+        error.message === 'Network request failed'
+          ? 'Không kết nối được Supabase. Vui lòng kiểm tra mạng của emulator hoặc thử lại sau.'
+          : error.message;
+      Alert.alert('Gửi email thất bại', message);
       return;
     }
 
     Alert.alert(
-      'Da gui email',
-      'Neu email ton tai trong he thong, ban se nhan duoc lien ket dat lai mat khau.',
+      'Đã gửi email',
+      'Nếu email tồn tại trong hệ thống, bạn sẽ nhận được liên kết đặt lại mật khẩu.',
       [{ text: 'OK', onPress: () => router.replace('/login') }]
     );
   }
@@ -59,7 +65,7 @@ export default function ForgotPasswordScreen() {
         showsVerticalScrollIndicator={false}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={22} color="#0f172a" />
-          <Text style={styles.backText}>Quay lai</Text>
+          <Text style={styles.backText}>Quay lại</Text>
         </Pressable>
 
         <View style={styles.header}>
@@ -67,14 +73,14 @@ export default function ForgotPasswordScreen() {
           <View style={styles.headerTop}>
             <View>
               <Text style={styles.kicker}>MealScan</Text>
-              <Text style={styles.title}>Quen mat khau</Text>
+              <Text style={styles.title}>Quên mật khẩu</Text>
             </View>
             <View style={styles.logoMark}>
               <Ionicons name="key-outline" size={26} color="#14B8A6" />
             </View>
           </View>
           <Text style={styles.subtitle}>
-            Nhap email da dang ky de nhan lien ket dat lai mat khau.
+            Nhập email đã đăng ký để nhận liên kết đặt lại mật khẩu.
           </Text>
         </View>
 
@@ -115,15 +121,15 @@ export default function ForgotPasswordScreen() {
               <ActivityIndicator color="#fff" />
             ) : (
               <>
-                <Text style={styles.primaryButtonText}>Gui email dat lai mat khau</Text>
+                <Text style={styles.primaryButtonText}>Gửi email đặt lại mật khẩu</Text>
                 <Ionicons name="send-outline" size={20} color="#fff" />
               </>
             )}
           </Pressable>
 
           <Pressable onPress={() => router.replace('/login')} style={styles.secondaryAction}>
-            <Text style={styles.secondaryText}>Da nho mat khau?</Text>
-            <Text style={styles.secondaryLink}>Dang nhap</Text>
+            <Text style={styles.secondaryText}>Đã nhớ mật khẩu?</Text>
+            <Text style={styles.secondaryLink}>Đăng nhập</Text>
           </Pressable>
         </View>
       </ScrollView>

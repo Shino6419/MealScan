@@ -27,7 +27,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Thong ke',
+          title: 'Thống kê',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="bar-chart-outline" size={size} color={color} />
           ),
@@ -36,16 +36,25 @@ export default function TabLayout() {
       <Tabs.Screen
         name="camera"
         options={{
-          title: 'Chup anh',
+          title: 'Chụp ảnh',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="camera-outline" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
+        name="recommend"
+        options={{
+          title: 'Đề xuất',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="chatbubbles-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
-          title: 'Cai dat',
+          title: 'Cài đặt',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-circle-outline" size={size} color={color} />
           ),

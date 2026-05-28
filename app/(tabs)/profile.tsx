@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 
-import { AUTH_DISABLED } from '@/constants/app-config';
+import { safeRequest } from '@/utils/safeRequest';
 import { supabase } from '@/utils/supabase';
 
 export default function ProfileScreen() {
@@ -28,17 +28,9 @@ export default function ProfileScreen() {
       async function loadProfile() {
         setIsLoading(true);
 
-        if (AUTH_DISABLED) {
-          if (isMounted) {
-            setEmail('demo@mealscan.local');
-            setFullName('Nguoi dung demo');
-            setDailyGoal('2000');
-            setIsLoading(false);
-          }
-          return;
-        }
-
-        const { data: authData } = await supabase.auth.getUser();
+        const { data: authData } = await supabase.auth
+          .getUser()
+          .catch(() => ({ data: { user: null } }));
         const user = authData.user;
 
         if (!user) {
@@ -48,11 +40,14 @@ export default function ProfileScreen() {
           return;
         }
 
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('full_name, daily_calorie_goal')
-          .eq('id', user.id)
-          .maybeSingle();
+        const { data: profile } = await safeRequest(
+          supabase
+            .from('profiles')
+            .select('full_name, daily_calorie_goal')
+            .eq('id', user.id)
+            .maybeSingle(),
+          { data: null },
+        );
 
         if (isMounted) {
           setEmail(user.email ?? '');
@@ -75,17 +70,14 @@ export default function ProfileScreen() {
       return;
     }
 
-    if (AUTH_DISABLED) {
-      Alert.alert('Che do demo', 'Dang nhap Supabase dang duoc tam tat.');
-      return;
-    }
-
     setIsLoggingOut(true);
-    const { error } = await supabase.auth.signOut();
+    const { error } = await supabase.auth
+      .signOut({ scope: 'local' })
+      .catch((requestError: Error) => ({ error: requestError }));
     setIsLoggingOut(false);
 
     if (error) {
-      Alert.alert('Dang xuat that bai', error.message);
+      Alert.alert('Đăng xuất thất bại', error.message);
       return;
     }
 
@@ -93,9 +85,9 @@ export default function ProfileScreen() {
   }
 
   function handleLogout() {
-    Alert.alert('Dang xuat', 'Ban co chac chan muon dang xuat khoi MealScan?', [
-      { text: 'Huy', style: 'cancel' },
-      { text: 'Dang xuat', style: 'destructive', onPress: logout },
+    Alert.alert('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất khỏi MealScan?', [
+      { text: 'Hủy', style: 'cancel' },
+      { text: 'Đăng xuất', style: 'destructive', onPress: logout },
     ]);
   }
 
@@ -106,13 +98,13 @@ export default function ProfileScreen() {
         <View style={styles.headerTop}>
           <View style={styles.headerCopy}>
             <Text style={styles.kicker}>Settings</Text>
-            <Text style={styles.title}>Cai dat</Text>
+            <Text style={styles.title}>Cài đặt</Text>
           </View>
           <View style={styles.headerIcon}>
             <Ionicons name="settings-outline" size={26} color="#14B8A6" />
           </View>
         </View>
-        <Text style={styles.subtitle}>Quan ly tai khoan va tuy chon MealScan.</Text>
+        <Text style={styles.subtitle}>Quản lý tài khoản và tùy chọn MealScan.</Text>
       </View>
 
       <View style={styles.profileCard}>
@@ -120,8 +112,8 @@ export default function ProfileScreen() {
           <Ionicons name="person" size={34} color="#14B8A6" />
         </View>
         <View style={styles.profileInfo}>
-          <Text style={styles.profileName}>{fullName || 'Nguoi dung MealScan'}</Text>
-          <Text style={styles.profileEmail}>{email || 'Chua co email'}</Text>
+          <Text style={styles.profileName}>{fullName || 'Người dùng MealScan'}</Text>
+          <Text style={styles.profileEmail}>{email || 'Chưa có email'}</Text>
         </View>
         {isLoading ? <ActivityIndicator color="#14B8A6" /> : null}
       </View>
@@ -129,20 +121,22 @@ export default function ProfileScreen() {
       <View style={styles.settingsSection}>
         <SettingRow
           icon="person-circle-outline"
-          title="Tuy chon tai khoan"
-          subtitle="Doi mat khau va ten hien thi"
+          title="Tùy chọn tài khoản"
+          subtitle="Đổi mật khẩu và tên hiển thị"
+          onPress={() => router.push('/account-options')}
         />
         <SettingRow
           icon="body-outline"
-          title="Thong tin the trang"
-          subtitle={`Muc tieu hien tai: ${dailyGoal} kcal/ngay`}
+          title="Thông tin thể trạng"
+          subtitle={`Mục tiêu hiện tại: ${dailyGoal} kcal/ngày`}
+          onPress={() => router.push('/body-profile')}
         />
         <SettingRow
           icon="notifications-outline"
-          title="Cai dat thong bao"
-          subtitle="Nhac nho bua an va thong bao hang ngay"
+          title="Cài đặt thông báo"
+          subtitle="Nhắc nhở bữa ăn và thông báo hằng ngày"
         />
-        <SettingRow icon="language-outline" title="Ngon ngu" subtitle="Tieng Viet" />
+        <SettingRow icon="language-outline" title="Ngôn ngữ" subtitle="Tiếng Việt" />
       </View>
 
       <Pressable
@@ -154,7 +148,7 @@ export default function ProfileScreen() {
         ) : (
           <>
             <Ionicons name="log-out-outline" size={20} color="#dc2626" />
-            <Text style={styles.logoutButtonText}>Dang xuat</Text>
+            <Text style={styles.logoutButtonText}>Đăng xuất</Text>
           </>
         )}
       </Pressable>
@@ -164,15 +158,19 @@ export default function ProfileScreen() {
 
 function SettingRow({
   icon,
+  onPress,
   title,
   subtitle,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
+  onPress?: () => void;
   title: string;
   subtitle: string;
 }) {
   return (
-    <Pressable style={({ pressed }) => [styles.settingRow, pressed && styles.settingRowPressed]}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.settingRow, pressed && styles.settingRowPressed]}>
       <View style={styles.settingIcon}>
         <Ionicons name={icon} size={20} color="#14B8A6" />
       </View>

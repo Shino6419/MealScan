@@ -14,110 +14,106 @@ import {
   View,
 } from 'react-native';
 
+import { safeRequest } from '@/utils/safeRequest';
 import { supabase } from '@/utils/supabase';
-
-const DEFAULT_CALORIE_GOAL = '2000';
 
 export default function RegisterScreen() {
   const router = useRouter();
   const fullNameInputRef = useRef<TextInput>(null);
   const emailInputRef = useRef<TextInput>(null);
-  const calorieInputRef = useRef<TextInput>(null);
   const passwordInputRef = useRef<TextInput>(null);
   const confirmPasswordInputRef = useRef<TextInput>(null);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [dailyCalorieGoal, setDailyCalorieGoal] = useState(DEFAULT_CALORIE_GOAL);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const normalizedEmail = email.trim();
   const normalizedName = fullName.trim();
-  const calorieGoal = Number(dailyCalorieGoal);
   const canSubmit =
     normalizedName.length > 0 &&
     normalizedEmail.length > 0 &&
     password.length > 0 &&
     confirmPassword.length > 0 &&
-    dailyCalorieGoal.length > 0 &&
     !isSubmitting;
 
   async function handleRegister() {
     if (!canSubmit) {
-      Alert.alert('Thieu thong tin', 'Vui long nhap day du thong tin dang ky.');
+      Alert.alert('Thiếu thông tin', 'Vui lòng nhập tên, email và mật khẩu.');
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Mat khau qua ngan', 'Mat khau can co it nhat 6 ky tu.');
+      Alert.alert('Mật khẩu quá ngắn', 'Mật khẩu cần có ít nhất 6 ký tự.');
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Mat khau khong khop', 'Vui long nhap lai mat khau xac nhan.');
-      return;
-    }
-
-    if (!Number.isFinite(calorieGoal) || calorieGoal <= 0) {
-      Alert.alert('Muc tieu calo khong hop le', 'Vui long nhap so calo lon hon 0.');
+      Alert.alert('Mật khẩu không khớp', 'Vui lòng nhập lại mật khẩu xác nhận.');
       return;
     }
 
     setIsSubmitting(true);
 
-    const { data, error } = await supabase.auth.signUp({
-      email: normalizedEmail,
-      password,
-      options: {
-        data: {
-          full_name: normalizedName,
+    const { data, error } = await supabase.auth
+      .signUp({
+        email: normalizedEmail,
+        password,
+        options: {
+          data: {
+            full_name: normalizedName,
+          },
         },
-      },
-    });
+      })
+      .catch((requestError: Error) => ({ data: { user: null, session: null }, error: requestError }));
 
     if (error) {
       setIsSubmitting(false);
-      Alert.alert('Dang ky that bai', error.message);
+      const message =
+        error.message === 'Network request failed'
+          ? 'Không kết nối được Supabase. Vui lòng kiểm tra mạng của emulator hoặc thử lại sau.'
+          : error.message;
+      Alert.alert('Đăng ký thất bại', message);
       return;
     }
 
     if (data.user?.identities?.length === 0) {
       setIsSubmitting(false);
-      Alert.alert('Dang ky that bai', 'Email nay da duoc dang ky. Vui long dang nhap.');
+      Alert.alert('Đăng ký thất bại', 'Email này đã được đăng ký. Vui lòng đăng nhập.');
       return;
     }
 
     if (data.user && data.session) {
-      const { error: profileError } = await supabase.from('profiles').upsert({
-        id: data.user.id,
-        full_name: normalizedName,
-        daily_calorie_goal: calorieGoal,
-      });
+      const { error: profileError } = await safeRequest(
+        supabase.from('profiles').upsert({
+          id: data.user.id,
+          full_name: normalizedName,
+        }),
+        { error: new Error('Network request failed') },
+      );
 
       setIsSubmitting(false);
 
       if (profileError) {
         Alert.alert(
-          'Dang ky thanh cong',
-          'Tai khoan da tao, nhung chua luu duoc muc tieu calo.',
-          [{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
+          'Đăng ký thành công',
+          'Tài khoản đã tạo, nhưng chưa lưu được tên hiển thị. Bạn có thể cập nhật sau.',
+          [{ text: 'OK', onPress: () => router.replace('/body-profile') }],
         );
         return;
       }
 
-      Alert.alert('Dang ky thanh cong', 'Tai khoan cua ban da duoc tao.', [
-        { text: 'OK', onPress: () => router.replace('/(tabs)') },
-      ]);
+      router.replace('/body-profile');
       return;
     }
 
     setIsSubmitting(false);
     Alert.alert(
-      'Kiem tra email',
-      'Tai khoan da duoc tao. Vui long xac nhan email truoc khi dang nhap.',
-      [{ text: 'OK', onPress: () => router.replace('/login') }]
+      'Kiểm tra email',
+      'Tài khoản đã được tạo. Vui lòng xác nhận email trước khi đăng nhập.',
+      [{ text: 'OK', onPress: () => router.replace('/login') }],
     );
   }
 
@@ -134,18 +130,20 @@ export default function RegisterScreen() {
           <View style={styles.headerTop}>
             <View>
               <Text style={styles.kicker}>MealScan</Text>
-              <Text style={styles.title}>Tao tai khoan</Text>
+              <Text style={styles.title}>Tạo tài khoản</Text>
             </View>
             <View style={styles.logoMark}>
               <Ionicons name="person-add" size={26} color="#14B8A6" />
             </View>
           </View>
-          <Text style={styles.subtitle}>Nhap muc tieu calo moi ngay de bat dau theo doi bua an.</Text>
+          <Text style={styles.subtitle}>
+            Tạo tài khoản trước, sau đó MealScan sẽ hỏi thêm thông tin thể trạng.
+          </Text>
         </View>
 
         <View style={styles.form}>
           <View style={styles.field}>
-            <Text style={styles.label}>Ho ten</Text>
+            <Text style={styles.label}>Họ tên</Text>
             <Pressable onPress={() => fullNameInputRef.current?.focus()} style={styles.inputWrap}>
               <Ionicons name="person-outline" size={20} color="#64748b" />
               <TextInput
@@ -154,7 +152,7 @@ export default function RegisterScreen() {
                 editable={!isSubmitting}
                 onChangeText={setFullName}
                 onSubmitEditing={() => emailInputRef.current?.focus()}
-                placeholder="Nguyen Van A"
+                placeholder="Nguyễn Văn A"
                 placeholderTextColor="#94a3b8"
                 returnKeyType="next"
                 showSoftInputOnFocus
@@ -177,7 +175,7 @@ export default function RegisterScreen() {
                 editable={!isSubmitting}
                 keyboardType="email-address"
                 onChangeText={setEmail}
-                onSubmitEditing={() => calorieInputRef.current?.focus()}
+                onSubmitEditing={() => passwordInputRef.current?.focus()}
                 placeholder="you@example.com"
                 placeholderTextColor="#94a3b8"
                 returnKeyType="next"
@@ -190,27 +188,7 @@ export default function RegisterScreen() {
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Muc tieu calo moi ngay</Text>
-            <Pressable onPress={() => calorieInputRef.current?.focus()} style={styles.inputWrap}>
-              <Ionicons name="flame-outline" size={20} color="#64748b" />
-              <TextInput
-                ref={calorieInputRef}
-                keyboardType="number-pad"
-                editable={!isSubmitting}
-                onChangeText={setDailyCalorieGoal}
-                onSubmitEditing={() => passwordInputRef.current?.focus()}
-                placeholder="2000"
-                placeholderTextColor="#94a3b8"
-                returnKeyType="next"
-                showSoftInputOnFocus
-                style={styles.input}
-                value={dailyCalorieGoal}
-              />
-            </Pressable>
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>Mat khau</Text>
+            <Text style={styles.label}>Mật khẩu</Text>
             <Pressable onPress={() => passwordInputRef.current?.focus()} style={styles.inputWrap}>
               <Ionicons name="lock-closed-outline" size={20} color="#64748b" />
               <TextInput
@@ -220,7 +198,7 @@ export default function RegisterScreen() {
                 editable={!isSubmitting}
                 onChangeText={setPassword}
                 onSubmitEditing={() => confirmPasswordInputRef.current?.focus()}
-                placeholder="It nhat 6 ky tu"
+                placeholder="Ít nhất 6 ký tự"
                 placeholderTextColor="#94a3b8"
                 returnKeyType="next"
                 secureTextEntry={!isPasswordVisible}
@@ -230,7 +208,7 @@ export default function RegisterScreen() {
                 value={password}
               />
               <Pressable
-                accessibilityLabel={isPasswordVisible ? 'An mat khau' : 'Hien mat khau'}
+                accessibilityLabel={isPasswordVisible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                 hitSlop={10}
                 onPress={() => setIsPasswordVisible((current) => !current)}>
                 <Ionicons
@@ -243,7 +221,7 @@ export default function RegisterScreen() {
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Nhap lai mat khau</Text>
+            <Text style={styles.label}>Nhập lại mật khẩu</Text>
             <Pressable onPress={() => confirmPasswordInputRef.current?.focus()} style={styles.inputWrap}>
               <Ionicons name="shield-checkmark-outline" size={20} color="#64748b" />
               <TextInput
@@ -253,7 +231,7 @@ export default function RegisterScreen() {
                 editable={!isSubmitting}
                 onChangeText={setConfirmPassword}
                 onSubmitEditing={handleRegister}
-                placeholder="Xac nhan mat khau"
+                placeholder="Xác nhận mật khẩu"
                 placeholderTextColor="#94a3b8"
                 returnKeyType="done"
                 secureTextEntry={!isPasswordVisible}
@@ -277,15 +255,15 @@ export default function RegisterScreen() {
               <ActivityIndicator color="#fff" />
             ) : (
               <>
-                <Text style={styles.primaryButtonText}>Dang ky</Text>
+                <Text style={styles.primaryButtonText}>Đăng ký</Text>
                 <Ionicons name="arrow-forward" size={20} color="#fff" />
               </>
             )}
           </Pressable>
 
           <Pressable onPress={() => router.replace('/login')} style={styles.secondaryAction}>
-            <Text style={styles.secondaryText}>Da co tai khoan?</Text>
-            <Text style={styles.secondaryLink}>Dang nhap</Text>
+            <Text style={styles.secondaryText}>Đã có tài khoản?</Text>
+            <Text style={styles.secondaryLink}>Đăng nhập</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -295,8 +273,8 @@ export default function RegisterScreen() {
 
 const styles = StyleSheet.create({
   screen: {
-    flex: 1,
     backgroundColor: '#F0FDFA',
+    flex: 1,
   },
   container: {
     flexGrow: 1,
@@ -309,14 +287,14 @@ const styles = StyleSheet.create({
     borderColor: '#CCFBF1',
     borderRadius: 8,
     borderWidth: 1,
+    elevation: 3,
     marginBottom: 18,
+    overflow: 'hidden',
     padding: 20,
     shadowColor: '#14B8A6',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
     shadowRadius: 16,
-    elevation: 3,
-    overflow: 'hidden',
   },
   headerStripe: {
     backgroundColor: '#38BDF8',
@@ -363,13 +341,13 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
     borderRadius: 8,
     borderWidth: 1,
+    elevation: 3,
     gap: 16,
     padding: 16,
     shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
     shadowRadius: 16,
-    elevation: 3,
   },
   field: {
     gap: 8,

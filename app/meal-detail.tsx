@@ -11,17 +11,30 @@ import {
   View,
 } from 'react-native';
 
+import { safeRequest } from '@/utils/safeRequest';
 import { supabase } from '@/utils/supabase';
 
 type MealDetail = {
   id: string;
   food_name: string;
   calories: number;
+  carbs_g: number | null;
+  fat_g: number | null;
   meal_type: string;
   eaten_at: string;
   image_url: string | null;
   notes: string | null;
+  protein_g: number | null;
 };
+
+function formatMealType(mealType: string) {
+  if (mealType === 'breakfast') return 'Bữa sáng';
+  if (mealType === 'lunch') return 'Bữa trưa';
+  if (mealType === 'afternoon' || mealType === 'snack') return 'Bữa chiều';
+  if (mealType === 'dinner') return 'Bữa tối';
+
+  return mealType;
+}
 
 export default function MealDetailScreen() {
   const router = useRouter();
@@ -39,15 +52,18 @@ export default function MealDetailScreen() {
         return;
       }
 
-      const { data, error } = await supabase
-        .from('meals')
-        .select('id, food_name, calories, meal_type, eaten_at, image_url, notes')
-        .eq('id', id)
-        .maybeSingle();
+      const { data, error } = await safeRequest(
+        supabase
+          .from('meals')
+          .select('id, food_name, calories, protein_g, fat_g, carbs_g, meal_type, eaten_at, image_url, notes')
+          .eq('id', id)
+          .maybeSingle(),
+        { data: null, error: new Error('Network request failed') },
+      );
 
       if (isMounted) {
         if (error) {
-          Alert.alert('Khong tai duoc du lieu', error.message);
+          Alert.alert('Không tải được dữ liệu', error.message);
         }
         setMeal(data ?? null);
         setIsLoading(false);
@@ -67,15 +83,18 @@ export default function MealDetailScreen() {
     }
 
     setIsDeleting(true);
-    const { error } = await supabase.from('meals').delete().eq('id', meal.id);
+    const { error } = await safeRequest(
+      supabase.from('meals').delete().eq('id', meal.id),
+      { error: new Error('Network request failed') },
+    );
     setIsDeleting(false);
 
     if (error) {
-      Alert.alert('Xoa that bai', error.message);
+      Alert.alert('Xóa thất bại', error.message);
       return;
     }
 
-    Alert.alert('Da xoa', 'Mon an da duoc xoa khoi lich su.', [
+    Alert.alert('Đã xóa', 'Món ăn đã được xóa khỏi lịch sử.', [
       { text: 'OK', onPress: () => router.replace('/(tabs)') },
     ]);
   }
@@ -84,7 +103,7 @@ export default function MealDetailScreen() {
     <ScrollView contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
       <Pressable onPress={() => router.back()} style={styles.backButton}>
         <Ionicons name="chevron-back" size={22} color="#0f172a" />
-        <Text style={styles.backText}>Quay lai</Text>
+        <Text style={styles.backText}>Quay lại</Text>
       </Pressable>
 
       <View style={styles.header}>
@@ -92,13 +111,13 @@ export default function MealDetailScreen() {
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.kicker}>Meal detail</Text>
-            <Text style={styles.title}>Chi tiet mon an</Text>
+            <Text style={styles.title}>Chi tiết món ăn</Text>
           </View>
           <View style={styles.headerIcon}>
             <Ionicons name="restaurant-outline" size={26} color="#14B8A6" />
           </View>
         </View>
-        <Text style={styles.subtitle}>Thong tin mon an da luu trong lich su.</Text>
+        <Text style={styles.subtitle}>Thông tin món ăn đã lưu trong lịch sử.</Text>
       </View>
 
       {isLoading ? (
@@ -114,19 +133,34 @@ export default function MealDetailScreen() {
           <Text style={styles.mealName}>{meal.food_name}</Text>
           <Text style={styles.calories}>{meal.calories} kcal</Text>
 
+          <View style={styles.nutritionGrid}>
+            <View style={styles.nutritionTile}>
+              <Text style={styles.nutritionLabel}>Protein</Text>
+              <Text style={styles.nutritionValue}>{meal.protein_g ?? 0}g</Text>
+            </View>
+            <View style={styles.nutritionTile}>
+              <Text style={styles.nutritionLabel}>Fat</Text>
+              <Text style={styles.nutritionValue}>{meal.fat_g ?? 0}g</Text>
+            </View>
+            <View style={styles.nutritionTile}>
+              <Text style={styles.nutritionLabel}>Carb</Text>
+              <Text style={styles.nutritionValue}>{meal.carbs_g ?? 0}g</Text>
+            </View>
+          </View>
+
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Loai bua an</Text>
-            <Text style={styles.metaValue}>{meal.meal_type}</Text>
+            <Text style={styles.metaLabel}>Loại bữa ăn</Text>
+            <Text style={styles.metaValue}>{formatMealType(meal.meal_type)}</Text>
           </View>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Thoi gian</Text>
+            <Text style={styles.metaLabel}>Thời gian</Text>
             <Text style={styles.metaValue}>
               {new Date(meal.eaten_at).toLocaleString('vi-VN')}
             </Text>
           </View>
           <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Ghi chu</Text>
-            <Text style={styles.metaValue}>{meal.notes || 'Khong co'}</Text>
+            <Text style={styles.metaLabel}>Ghi chú</Text>
+            <Text style={styles.metaValue}>{meal.notes || 'Không có'}</Text>
           </View>
 
           <Pressable disabled={isDeleting} onPress={handleDelete} style={styles.deleteButton}>
@@ -135,7 +169,7 @@ export default function MealDetailScreen() {
             ) : (
               <>
                 <Ionicons name="trash-outline" size={20} color="#dc2626" />
-                <Text style={styles.deleteButtonText}>Xoa mon an</Text>
+                <Text style={styles.deleteButtonText}>Xóa món ăn</Text>
               </>
             )}
           </Pressable>
@@ -143,7 +177,7 @@ export default function MealDetailScreen() {
       ) : (
         <View style={styles.emptyBox}>
           <Ionicons name="alert-circle-outline" size={30} color="#64748b" />
-          <Text style={styles.emptyTitle}>Khong tim thay mon an</Text>
+          <Text style={styles.emptyTitle}>Không tìm thấy món ăn</Text>
         </View>
       )}
     </ScrollView>
@@ -258,6 +292,31 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0,
     marginTop: 8,
+  },
+  nutritionGrid: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 14,
+    marginBottom: 8,
+  },
+  nutritionTile: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#CCFBF1',
+    borderRadius: 8,
+    borderWidth: 1,
+    flex: 1,
+    padding: 10,
+  },
+  nutritionLabel: {
+    color: '#64748B',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  nutritionValue: {
+    color: '#111827',
+    fontSize: 15,
+    fontWeight: '800',
+    marginTop: 4,
   },
   metaRow: {
     borderTopColor: '#e2e8f0',
